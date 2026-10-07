@@ -11,15 +11,25 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import tkinter as tk
+import urllib.request
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox, ttk
 
 # ───────────────────────── Константы и пути ─────────────────────────
+
+APP_VERSION = "1.0.0"
+REPO_URL = "https://github.com/QteaJin/FastUpdater"
+REPO_RAW_URL = "https://raw.githubusercontent.com/QteaJin/FastUpdater/main/updater.py"
+REPO_ZIP_URL = REPO_URL + "/archive/refs/heads/main.zip"
+UPDATE_TIMEOUT = 8  # секунд на проверку версии
+KEEP_FILES = {"config.json", "learned_admin.json"}  # пользовательские файлы не перезаписываем при обновлении
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "config.json"
@@ -31,6 +41,7 @@ DEFAULT_CONFIG = {
     "admin_required": ["Microsoft.VCRedist.*", "Microsoft.Edge", "Logitech.LogiTune"],
     "include_admin_in_update_all": False,
     "language": "en",
+    "check_app_updates": True,
 }
 
 PER_PACKAGE_TIMEOUT = 600  # 10 минут на одну программу
@@ -85,6 +96,12 @@ STRINGS = {
         "internal_error": "Internal error, see log for details",
         "raw_title": "Raw winget output",
         "lang_btn": "RU",
+        "app_update_title": "FastUpdater update",
+        "app_update_prompt": "Version {new} is available (you have {cur}).\nUpdate now?",
+        "app_update_installing": "Updating FastUpdater…",
+        "app_update_done": "FastUpdater updated to {new}",
+        "app_update_restart": "FastUpdater was updated to version {new}.\nRestart now?",
+        "app_update_failed": "Could not update FastUpdater. Download the latest version manually:\n" + REPO_URL,
     },
     "ru": {
         "theme": "◐ Тема", "check": "Проверить обновления", "update_all": "Обновить все",
@@ -110,6 +127,12 @@ STRINGS = {
         "internal_error": "Внутренняя ошибка, подробности в логе",
         "raw_title": "Сырой вывод winget",
         "lang_btn": "EN",
+        "app_update_title": "Обновление FastUpdater",
+        "app_update_prompt": "Доступна версия {new} (у вас {cur}).\nОбновить сейчас?",
+        "app_update_installing": "Обновляю FastUpdater…",
+        "app_update_done": "FastUpdater обновлён до {new}",
+        "app_update_restart": "FastUpdater обновлён до версии {new}.\nПерезапустить сейчас?",
+        "app_update_failed": "Не удалось обновить FastUpdater. Скачайте последнюю версию вручную:\n" + REPO_URL,
     },
 }
 
@@ -347,6 +370,63 @@ def classify(rc: int | None, output: str) -> str:
     return "error"
 
 
+# ───────────────────────── Самообновление ─────────────────────────
+
+VERSION_RE = re.compile(r'^APP_VERSION\s*=\s*"(\d+(?:\.\d+)*)"', re.M)
+
+
+def parse_version(text: str) -> str | None:
+    m = VERSION_RE.search(text)
+    return m.group(1) if m else None
+
+
+def version_key(v: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in v.split("."))
+
+
+def _http_get(url: str, timeout: int) -> urllib.request.addinfourl:
+    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "FastUpdater"}),
+                                  timeout=timeout)
+
+
+def remote_version() -> str | None:
+    """Версия из updater.py в ветке main на GitHub (None, если не удалось разобрать)."""
+    with _http_get(REPO_RAW_URL, UPDATE_TIMEOUT) as r:
+        return parse_version(r.read().decode("utf-8", errors="replace"))
+
+
+def install_update() -> str:
+    """Скачивает main-архив и заменяет файлы программы (кроме KEEP_FILES). Возвращает новую версию."""
+    with tempfile.TemporaryDirectory() as tmp:
+        zpath = Path(tmp) / "update.zip"
+        with _http_get(REPO_ZIP_URL, 60) as r, open(zpath, "wb") as f:
+            shutil.copyfileobj(r, f)
+        with zipfile.ZipFile(zpath) as z:
+            names = [n for n in z.namelist() if not n.endswith("/")]
+            if not names:
+                raise ValueError("empty archive")
+            root = names[0].split("/")[0]
+            files: dict[str, Path] = {}
+            for n in names:
+                parts = n.split("/")
+                rel = Path(*parts[1:]) if len(parts) > 1 else None
+                if parts[0] != root or rel is None or rel.is_absolute() or ".." in rel.parts:
+                    raise ValueError(f"unexpected path in archive: {n}")
+                if rel.parts[0].startswith(".git") or rel.name in KEEP_FILES:
+                    continue
+                files[n] = rel
+            new_ver = parse_version(z.read(f"{root}/updater.py").decode("utf-8", errors="replace"))
+            if not new_ver:
+                raise ValueError("updater.py in archive has no APP_VERSION")
+            for n, rel in files.items():
+                dest = BASE_DIR / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                part = dest.with_name(dest.name + ".new")
+                part.write_bytes(z.read(n))
+                os.replace(part, dest)
+    return new_ver
+
+
 # ───────────────────────── Тема ─────────────────────────
 
 LIGHT = dict(bg="#f3f4f6", card="#ffffff", fg="#1f2937", muted="#6b7280", accent="#2563eb",
@@ -399,6 +479,8 @@ class App:
         self.apply_theme()
         root.after(100, self._poll)
         root.after(200, self.check_updates)
+        if self.cfg.get("check_app_updates") and not (BASE_DIR / ".git").exists():  # из git-клона не трогаем
+            threading.Thread(target=self._app_update_check, daemon=True).start()
         self.log.info("--- FastUpdater started ---")
 
     # ----- UI -----
@@ -714,6 +796,29 @@ class App:
         if recheck:
             self.events.put(("list", self._fetch_list()))
 
+    # ----- Самообновление -----
+
+    def _app_update_check(self) -> None:
+        try:
+            remote = remote_version()
+            if remote and version_key(remote) > version_key(APP_VERSION):
+                self.events.put(("app_update", remote))
+        except Exception as e:  # нет сети и т.п. — молча, только в лог
+            self.log.info(f"App update check failed: {e!r}")
+
+    def _app_update_install(self, remote: str) -> None:
+        try:
+            new_ver = install_update()
+            self.log.info(f"FastUpdater updated {APP_VERSION} -> {new_ver}")
+            self.events.put(("app_update_done", new_ver))
+        except Exception:
+            self.log.exception("installing app update")
+            self.events.put(("app_update_failed",))
+
+    def _restart(self) -> None:
+        subprocess.Popen([sys.executable, str(BASE_DIR / "updater.py")], creationflags=CREATE_NO_WINDOW)
+        self.root.destroy()
+
     # ----- События из потоков -----
 
     def _guard(self, fn):
@@ -776,6 +881,19 @@ class App:
                 self.say(lambda: t("parse_fail"))
                 self.show_raw(res[1])
             self.set_busy(False)
+        elif kind == "app_update":
+            remote = ev[1]
+            if messagebox.askyesno(t("app_update_title"), t("app_update_prompt", new=remote, cur=APP_VERSION)):
+                self.say(lambda: t("app_update_installing"))
+                threading.Thread(target=self._app_update_install, args=(remote,), daemon=True).start()
+        elif kind == "app_update_done":
+            new_ver = ev[1]
+            self.say(lambda: t("app_update_done", new=new_ver))
+            if messagebox.askyesno(t("app_update_title"), t("app_update_restart", new=new_ver)):
+                self._restart()
+        elif kind == "app_update_failed":
+            self.say(lambda: t("app_update_failed").split("\n")[0])
+            messagebox.showerror(t("app_update_title"), t("app_update_failed"))
         elif kind == "fatal":
             self.progress.stop()
             self.say(lambda: t(ev[1]))

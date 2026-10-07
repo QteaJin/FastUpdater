@@ -42,8 +42,15 @@ Other buttons:
 | `admin_required` | Package IDs marked "admin required": not pre-selected and skipped by **Update all**. |
 | `include_admin_in_update_all` | Set to `true` to include admin-required programs in **Update all**. |
 | `language` | `en` (default) or `ru`. |
+| `check_app_updates` | `true` (default) checks GitHub for a new FastUpdater version on start. Set to `false` to turn it off. |
 
 If an update fails because it needs administrator rights, the program remembers it (`learned_admin.json`) and marks it in advance next time. To update such a program, run the app as administrator and select it manually.
+
+## Updates
+
+On start, FastUpdater checks GitHub for a newer version of itself. If there is one, a popup asks whether to update. After you agree it downloads the new files, keeps your `config.json` and `learned_admin.json`, and offers to restart. If you are offline, nothing happens. Copies cloned with git are never touched (use `git pull`).
+
+For maintainers: raise `APP_VERSION` in `updater.py` and push to `main` to publish a new version.
 
 ## Logs
 

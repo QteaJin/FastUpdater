@@ -8,5 +8,6 @@
     "Logitech.LogiTune"
   ],
   "include_admin_in_update_all": false,
-  "language": "en"
+  "language": "en",
+  "check_app_updates": true
 }
