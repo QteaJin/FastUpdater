@@ -4,6 +4,8 @@ A small Windows app that updates your installed programs in a few clicks. It sho
 
 No dependencies, no installer, no administrator rights needed.
 
+![FastUpdater screenshot](screenshot.png)
+
 ## What you need
 
 - Windows 10 or 11 with **winget** (App Installer). It is already included in modern Windows. If it is missing, install "App Installer" from the Microsoft Store.

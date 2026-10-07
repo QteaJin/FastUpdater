@@ -62,8 +62,8 @@ LANG = "en"
 
 STRINGS = {
     "en": {
-        "theme": "◐ Theme", "check": "⟳  Check for updates", "update_all": "Update all",
-        "update_sel": "⬆  Update selected", "open_log": "Open log", "select_all": "Select all",
+        "theme": "◐ Theme", "check": "Check for updates", "update_all": "Update all",
+        "update_sel": "Update selected", "open_log": "Open log", "select_all": "Select all",
         "col_name": "Name", "col_id": "ID", "col_cur": "Current version", "col_avail": "Available version",
         "col_src": "Source", "col_status": "Status",
         "starting": "Starting…", "checking": "Checking for updates…", "nothing_selected": "Nothing selected",
@@ -87,8 +87,8 @@ STRINGS = {
         "lang_btn": "RU",
     },
     "ru": {
-        "theme": "◐ Тема", "check": "⟳  Проверить обновления", "update_all": "Обновить все",
-        "update_sel": "⬆  Обновить выбранные", "open_log": "Открыть лог", "select_all": "Выбрать все",
+        "theme": "◐ Тема", "check": "Проверить обновления", "update_all": "Обновить все",
+        "update_sel": "Обновить выбранные", "open_log": "Открыть лог", "select_all": "Выбрать все",
         "col_name": "Имя", "col_id": "ID", "col_cur": "Текущая версия", "col_avail": "Доступная версия",
         "col_src": "Источник", "col_status": "Статус",
         "starting": "Запуск…", "checking": "Проверяю обновления…", "nothing_selected": "Ничего не выбрано",
@@ -440,8 +440,8 @@ class App:
         card.pack(fill="both", expand=True)
         cols = ("name", "id", "cur", "avail", "src", "status")
         self.tree = ttk.Treeview(card, columns=cols, show="tree headings", selectmode="browse")
-        heads = {"#0": ("", 44), "name": ("col_name", 270), "id": ("col_id", 230), "cur": ("col_cur", 130),
-                 "avail": ("col_avail", 130), "src": ("col_src", 80), "status": ("col_status", 220)}
+        heads = {"#0": ("", 44), "name": ("col_name", 270), "id": ("col_id", 230), "cur": ("col_cur", 160),
+                 "avail": ("col_avail", 170), "src": ("col_src", 80), "status": ("col_status", 220)}
         self.head_keys = {c: k for c, (k, _) in heads.items() if k}
         for col, (_key, width) in heads.items():
             self.tree.heading(col, anchor="w")
