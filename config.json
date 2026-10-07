@@ -1,0 +1,12 @@
+{
+  "exclude": [
+    "Python.Launcher"
+  ],
+  "admin_required": [
+    "Microsoft.VCRedist.*",
+    "Microsoft.Edge",
+    "Logitech.LogiTune"
+  ],
+  "include_admin_in_update_all": false,
+  "language": "en"
+}

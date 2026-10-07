@@ -1,2 +1,14 @@
 # FastUpdater
-FastUpdater is a lightweight Windows GUI for updating installed programs via winget. Built with Python and Tkinter, no dependencies. Check available updates, select what to upgrade or update all, with light/dark themes, English/Russian UI, admin-required detection, daily logs and a failure report for easy troubleshooting.
+
+Мини-утилита (Python 3.13 + Tkinter, без зависимостей) для обновления программ через winget.
+
+- **Запуск:** двойной клик по `run.bat`. Права администратора не нужны. `run.bat` только проверяет, что установлен Python 3 с Tkinter, и запускает программу; если Python не найден, выводит сообщение (сам ничего не устанавливает).
+- Список обновлений загружается при старте. Галочки — клик по квадрату слева (или пробел). «Обновить выбранные» — только отмеченные; «Обновить все» — все, кроме `exclude` и программ, требующих админа.
+- **Лог:** `%USERPROFILE%\UpdateLogs\update-ГГГГ-ММ-ДД.log` (кнопка «Открыть лог»). Неудачи дополнительно пишутся в `failures.jsonl` в той же папке — его целиком можно отдать Claude для разбора.
+- **config.json** (создаётся сам рядом со скриптом):
+  - `exclude` — ID, которые не показываются и не обновляются (маски `*` допустимы);
+  - `admin_required` — ID, помеченные «нужен админ» (не отмечаются, не входят в «Обновить все»);
+  - `include_admin_in_update_all` — `true`, чтобы включить их в «Обновить все»;
+  - `language` — язык интерфейса: `en` (по умолчанию) или `ru`. Переключается кнопкой `RU`/`EN` в правом верхнем углу, выбор сохраняется. Лог всегда на английском.
+- `learned_admin.json` пополняется автоматически, когда установка упала из-за нехватки прав.
+- **Проверка парсера:** `py -3 updater.py --test-parser sample_output.txt`
